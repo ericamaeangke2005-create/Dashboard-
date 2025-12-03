@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Eco Sensor Monitor</title>
+<meta name="description" content="Mobile-friendly Temperature & Humidity monitor (ThingSpeak)">
+<!-- PWA manifest and theme -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f172a">
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js')
+    .then(() => console.log('Service Worker registered'));
+}
+</script>
+
+<style>
+:root {
+  --bg: #0f172a;
+  --card: #0b1220;
+  --accent-temp: #ff7a59;
+  --accent-hum: #00c6ff;
+  --muted: #94a3b8;
+  --glass: rgba(255,255,255,0.03);
+}
+html, body {height:100%; margin:0; font-family:Inter,system-ui,Arial,Helvetica,sans-serif; background:linear-gradient(180deg,#071024 0%, #071f39 100%); color:#e6eef8;}
+.wrap{max-width:920px;margin:12px auto;padding:14px;}
+header{display:flex;align-items:center;justify-content:space-between; flex-wrap:wrap;}
+h1{font-size:1.05rem;margin:0;}
+.sub{color:var(--muted);font-size:0.88rem;}
+.controls{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+button{background:var(--accent-temp);border:0;padding:10px 14px;border-radius:10px;color:white;font-weight:600; cursor:pointer;}
+button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);}
+input{border-radius:8px;border:none;background:var(--glass);color:inherit;padding:8px;width:68px;}
+.grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:14px;}
+@media(min-width:720px){.grid{grid-template-columns:1fr 1fr;}}
+.card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 24px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.03); text-align:center;}
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;}
+svg.gauge{width:180px;height:120px;}
+.gauge-center{display:flex;flex-direction:column;align-items:center;}
+.big-value{font-size:2rem;font-weight:700;}
+.meta{color:var(--muted);font-size:0.85rem;}
+footer{margin-top:14px;color:var(--muted);font-size:0.82rem;text-align:center;}
+#qrCode{margin-top:20px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>🌡️ Eco Sensor Monitor</h1>
+      <div class="sub">Live from ThingSpeak • Channel <strong>3149765</strong></div>
+    </div>
+    <div class="sub">Mobile-ready • Add to Home Screen</div>
+  </header>
+
+  <div class="controls">
+    <button id="startBtn">Start</button>
+    <button id="stopBtn" class="ghost">Stop</button>
+    <div style="display:flex;align-items:center;gap:8px;margin-left:6px">
+      <label class="small">Poll interval (s)</label>
+      <input id="intervalInput" type="number" min="5" value="15">
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- Temperature Gauge -->
+    <div class="card gauge-wrap">
+      <div class="meta">Temperature</div>
+      <svg class="gauge" viewBox="0 0 220 120">
+        <path d="M20 100 A90 90 0 0 1 200 100" stroke="rgba(255,255,255,0.06)" stroke-width="18" fill="none" stroke-linecap="round"/>
+        <path d="M20 100 A90 90 0 0 1 200 100" stroke="url(#gradTemp)" stroke-width="18" fill="none" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="gradTemp" x1="0" x2="1">
+            <stop offset="0%" stop-color="#00ff88"/>
+            <stop offset="50%" stop-color="#ffdc00"/>
+            <stop offset="100%" stop-color="#ff3d3d"/>
+          </linearGradient>
+        </defs>
+        <text x="16" y="115" font-size="12" fill="var(--muted)">-10°C</text>
+        <text x="170" y="115" font-size="12" fill="var(--muted)">50°C</text>
+        <line id="tempArrow" x1="110" y1="60" x2="110" y2="10" stroke="#ffffff" stroke-width="3" stroke-linecap="round" transform="rotate(-180 110 60)"/>
+      </svg>
+      <div class="gauge-center">
+        <div class="big-value" id="tempValue">-- °C</div>
+        <div class="meta" id="tempTime">—</div>
+      </div>
+    </div>
+
+    <!-- Humidity Gauge -->
+    <div class="card gauge-wrap">
+      <div class="meta">Humidity</div>
+      <svg class="gauge" viewBox="0 0 220 120">
+        <path d="M20 100 A90 90 0 0 1 200 100" stroke="rgba(255,255,255,0.06)" stroke-width="18" fill="none" stroke-linecap="round"/>
+        <path d="M20 100 A90 90 0 0 1 200 100" stroke="url(#gradHum)" stroke-width="18" fill="none" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="gradHum" x1="0" x2="1">
+            <stop offset="0%" stop-color="#00ff88"/>
+            <stop offset="50%" stop-color="#ffdc00"/>
+            <stop offset="100%" stop-color="#ff3d3d"/>
+          </linearGradient>
+        </defs>
+        <text x="16" y="115" font-size="12" fill="var(--muted)">0%</text>
+        <text x="170" y="115" font-size="12" fill="var(--muted)">100%</text>
+        <line id="humArrow" x1="110" y1="60" x2="110" y2="10" stroke="#ffffff" stroke-width="3" stroke-linecap="round" transform="rotate(-180 110 60)"/>
+      </svg>
+      <div class="gauge-center">
+        <div class="big-value" id="humValue">-- %</div>
+        <div class="meta" id="humTime">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QR Code Section -->
+  <div id="qrCode"></div>
+
+  <footer>
+    Tip: Open this page in Chrome → Menu → Add to Home screen for app installation.
+  </footer>
+</div>
+
+<!-- QR Code Library -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<script>
+QRCode.toCanvas(document.getElementById('qrCode'), window.location.href, {width:150}, err=>{
+  if(err) console.error(err);
+});
+</script>
+
+<script>
+const CHANNEL_ID = 3149765;
+const READ_API_KEY = 'L5WD9G1IQX5ZQN3S';
+const FIELD_TEMP = 1;
+const FIELD_HUM = 2;
+
+const startBtn = document.getElementById('startBtn');
+const stopBtn  = document.getElementById('stopBtn');
+const intervalInput = document.getElementById('intervalInput');
+const tempValue = document.getElementById('tempValue');
+const humValue = document.getElementById('humValue');
+const tempTime = document.getElementById('tempTime');
+const humTime = document.getElementById('humTime');
+const tempArrow = document.getElementById('tempArrow');
+const humArrow = document.getElementById('humArrow');
+
+let timer = null;
+
+async function fetchLatest() {
+  try {
+    const urlLast = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds/last.json?api_key=${READ_API_KEY}`;
+    const res = await fetch(urlLast);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const t = parseFloat(data[`field${FIELD_TEMP}`]);
+    const h = parseFloat(data[`field${FIELD_HUM}`]);
+    const created_at = data.created_at ? new Date(data.created_at) : null;
+
+    if(!isNaN(t)){
+      tempValue.textContent = t.toFixed(1) + ' °C';
+      tempTime.textContent = created_at ? created_at.toLocaleTimeString() : '—';
+      updateArrow(tempArrow, t, -10, 50);
+    }
+    if(!isNaN(h)){
+      humValue.textContent = h.toFixed(1) + ' %';
+      humTime.textContent = created_at ? created_at.toLocaleTimeString() : '—';
+      updateArrow(humArrow, h, 0, 100);
+    }
+  } catch(err){console.warn(err);}
+}
+
+function updateArrow(arrowEl, value, min, max){
+  const angle = ((value - min)/(max - min))*180 - 180;
+  arrowEl.setAttribute('transform', `rotate(${angle} 110 60)`);
+}
+
+function startPolling(){
+  stopPolling();
+  const intervalSec = Math.max(5, parseInt(intervalInput.value)||15);
+  fetchLatest();
+  timer = setInterval(fetchLatest, intervalSec*1000);
+  startBtn.disabled=true;
+}
+function stopPolling(){ if(timer) clearInterval(timer); timer=null; startBtn.disabled=false; }
+
+startBtn.addEventListener('click', startPolling);
+stopBtn.addEventListener('click', stopPolling);
+</script>
+</body>
+</html>
